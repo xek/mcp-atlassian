@@ -2126,9 +2126,7 @@ class TestPagesOAuthMixin:
                 view_html
             )
             oauth_pages_mixin.preprocessor.process_html_content.assert_not_called()
-            assert (
-                result.content == "[Docs](https://example.atlassian.net/wiki/x/abc)"
-            )
+            assert result.content == "[Docs](https://example.atlassian.net/wiki/x/abc)"
 
     def test_delete_page_oauth_uses_v2_api(self, oauth_pages_mixin):
         """Test that OAuth authentication uses v2 API for deleting pages."""
@@ -2169,7 +2167,7 @@ class TestPagesOAuthMixin:
             mock_v2_adapter_class.return_value = mock_v2_adapter
 
             view_html = (
-                '<h2>OAuth Historical</h2><p>'
+                "<h2>OAuth Historical</h2><p>"
                 '<a href="https://example.atlassian.net/wiki/x/abc">Docs</a>'
                 "</p>"
             )
