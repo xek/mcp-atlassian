@@ -2083,6 +2083,53 @@ class TestPagesOAuthMixin:
             assert result.space.key == "PROJ"
             assert result.version.number == 3
 
+    def test_get_page_content_oauth_prefers_rendered_view_for_markdown(
+        self, oauth_pages_mixin
+    ):
+        """OAuth markdown reads should use rendered body.view when the v2 API provides it."""
+        page_id = "oauth_view_123"
+        view_html = (
+            '<p>See <a href="https://example.atlassian.net/wiki/x/abc">Docs</a></p>'
+        )
+
+        with patch(
+            "mcp_atlassian.confluence.pages.ConfluenceV2Adapter"
+        ) as mock_v2_adapter_class:
+            mock_v2_adapter = MagicMock()
+            mock_v2_adapter_class.return_value = mock_v2_adapter
+            mock_v2_adapter.get_page.return_value = {
+                "id": page_id,
+                "title": "OAuth Rendered Page",
+                "body": {
+                    "view": {"value": view_html},
+                    "storage": {"value": "<p><ac:link>Docs</ac:link></p>"},
+                },
+                "space": {"key": "PROJ", "name": "Project"},
+                "version": {"number": 1},
+                "children": {"attachment": {"results": []}},
+            }
+            mock_v2_adapter.get_page_emoji.return_value = None
+            oauth_pages_mixin.preprocessor.process_rendered_html_content.return_value = (
+                view_html,
+                "[Docs](https://example.atlassian.net/wiki/x/abc)",
+            )
+
+            result = oauth_pages_mixin.get_page_content(
+                page_id, convert_to_markdown=True
+            )
+
+            mock_v2_adapter.get_page.assert_called_once_with(
+                page_id=page_id,
+                expand="body.view,version,space,children.attachment,history",
+            )
+            oauth_pages_mixin.preprocessor.process_rendered_html_content.assert_called_once_with(
+                view_html
+            )
+            oauth_pages_mixin.preprocessor.process_html_content.assert_not_called()
+            assert (
+                result.content == "[Docs](https://example.atlassian.net/wiki/x/abc)"
+            )
+
     def test_delete_page_oauth_uses_v2_api(self, oauth_pages_mixin):
         """Test that OAuth authentication uses v2 API for deleting pages."""
         # Arrange
@@ -2121,25 +2168,27 @@ class TestPagesOAuthMixin:
             mock_v2_adapter = MagicMock()
             mock_v2_adapter_class.return_value = mock_v2_adapter
 
-            # Mock v2 API response for historical page
+            view_html = (
+                '<h2>OAuth Historical</h2><p>'
+                '<a href="https://example.atlassian.net/wiki/x/abc">Docs</a>'
+                "</p>"
+            )
             mock_v2_adapter.get_page_by_version.return_value = {
                 "id": page_id,
                 "title": "OAuth Historical Page",
                 "space": {"key": "OAUTH", "name": "OAuth Space"},
                 "version": {"number": version},
                 "body": {
-                    "storage": {"value": "<h2>OAuth Historical</h2><p>Content</p>"}
+                    "view": {"value": view_html},
+                    "storage": {"value": "<h2>OAuth Historical</h2><p>Content</p>"},
                 },
                 "children": {"attachment": {"results": []}},
             }
 
-            # Mock emoji
             mock_v2_adapter.get_page_emoji.return_value = None
-
-            # Mock preprocessor
-            oauth_pages_mixin.preprocessor.process_html_content.return_value = (
-                "<h2>OAuth Historical</h2><p>Content</p>",
-                "## OAuth Historical\n\nContent",
+            oauth_pages_mixin.preprocessor.process_rendered_html_content.return_value = (
+                view_html,
+                "## OAuth Historical\n\n[Docs](https://example.atlassian.net/wiki/x/abc)",
             )
 
             # Act
@@ -2162,8 +2211,15 @@ class TestPagesOAuthMixin:
             assert result.id == page_id
             assert result.title == "OAuth Historical Page"
             assert result.version.number == version
-            assert result.content == "## OAuth Historical\n\nContent"
+            assert (
+                result.content
+                == "## OAuth Historical\n\n[Docs](https://example.atlassian.net/wiki/x/abc)"
+            )
             assert result.space.key == "OAUTH"
+            oauth_pages_mixin.preprocessor.process_rendered_html_content.assert_called_once_with(
+                view_html
+            )
+            oauth_pages_mixin.preprocessor.process_html_content.assert_not_called()
 
     def test_get_page_history_oauth_success(self, oauth_pages_mixin):
         """Test successfully retrieving historical version with OAuth."""

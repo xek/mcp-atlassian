@@ -336,7 +336,8 @@ class ConfluenceV2Adapter:
 
         Args:
             page_id: The ID of the page to retrieve
-            expand: Fields to expand in the response (not used in v2 API, for compatibility only)
+            expand: v1-style expand string; ``body.view`` maps to
+                ``body-format=view``, otherwise storage is requested.
 
         Returns:
             The page data from the API response in v1-compatible format
@@ -1242,10 +1243,17 @@ class ConfluenceV2Adapter:
         1. List all versions to find the version ID for the given version number
         2. Fetch the specific version using its version ID
 
+        Rendered HTML (``body.view``) is only available from the v2 pages
+        endpoint via ``version`` + ``body-format=view``. The version-detail
+        endpoint accepts ``body-format=storage`` only, so storage requests
+        keep using that narrower path.
+
         Args:
             page_id: The ID of page
             version: The version number to retrieve
-            expand: Fields to expand in the response
+            expand: v1-style expand string; ``body.view`` selects the pages
+                endpoint with rendered HTML, otherwise storage is fetched
+                from the version-detail endpoint.
 
         Returns:
             The page data for the specified version in v1-compatible format
